@@ -10,11 +10,13 @@
 
   <!-- Load the model from an online source -->
   <script>
-    const modelPath = 'diceReaderModeltfjs_reduced/model.json';
+    // Local model path
+    const modelPath = './model.json';
     let model;
 
     async function loadModel() {
-      model = await tf.loadGraphModel(modelPath);
+      // Use the tf.loadSavedModel() function to load the local model
+      model = await tf.loadSavedModel(modelPath);
     }
 
     loadModel();
@@ -63,4 +65,70 @@
   </script>
 </body>
 </html>
+<html>
+<head>
+  <title>TensorflowJS Image Classification</title>
+</head>
+<body>
+  <h1>TensorflowJS Image Classification</h1>
 
+  <!-- Load the TensorflowJS library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+
+  <!-- Load the model from an online source -->
+  <script>
+    // Local model path
+    const modelPath = 'diceReaderModeltfjs_reduced/model.json';
+    let model;
+
+    async function loadModel() {
+      // Use the tf.loadSavedModel() function to load the local model
+      model = await tf.loadSavedModel(modelPath);
+    }
+
+    loadModel();
+  </script>
+
+  <!-- Display a video element to show the camera feed -->
+  <video id="camera-feed" autoplay></video>
+
+  <!-- Display the classification output -->
+  <div id="classification-output">
+    <p>Classification: <span id="classification-label"></span></p>
+  </div>
+
+  <!-- Run the classification on the camera feed -->
+  <script>
+    // Get the video element and the classification label
+    const video = document.getElementById('camera-feed');
+    const output = document.getElementById('classification-label');
+
+    // Get the user's camera and start the video feed
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+
+        // Start the classification when the video has loaded
+        video.addEventListener('loadeddata', classifyVideo);
+      });
+
+    // Function to classify the current frame of the video
+    async function classifyVideo() {
+      // Preprocess the image for the model
+      const image = await tf.browser.fromPixels(video);
+      const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
+      const normalizedImage = tf.div(tf.sub(resizedImage, 127.5), 127.5);
+
+      // Run the classification on the image
+      const predictions = await model.predict(normalizedImage.expandDims());
+      const label = predictions.argMax(1).dataSync()[0];
+
+      // Display the classification output
+      output.innerHTML = label;
+
+      // Continue to classify the video feed in a loop
+      setTimeout(classifyVideo, 1000);
+    }
+  </script>
+</body>
+</html>
