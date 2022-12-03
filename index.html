@@ -10,7 +10,7 @@
 
   <!-- Load the model from the local folder -->
   <script>
-    const modelUrl = './diceDetectionModeltfjs_reduced/model.json';
+    const modelUrl = './diceReaderModeltfjs_reduced/model.json';
     let model;
 
     async function loadModel() {
@@ -89,7 +89,7 @@
       }
     }
     
-    <!-- Function that takes in an image and returns the split up images -->
+    <!-- Function that processes the predictions -->
     function processPredictions(predictions, image_ids, image_grid) {
       var bboxes = {};
       
@@ -103,22 +103,23 @@
           bboxes[image_ids[i]][j][3] = bboxes[image_ids[i]][j][3] - bboxes[image_ids[i]][j][1];
         }
       }
+      
       return bboxes;
     }
     
-    <!-- Function that takes in an image and returns the split up images -->
+    <!-- Function that converts the predictions to bounding boxes -->
     function predictionToBbox(bboxes, image_grid) {
-      bboxes = bboxes.copy();
+      bboxes = bboxes.slice();
       
-      var im_width = (image_grid[:,:,2] * 32);
-      var im_height = (image_grid[:,:,3] * 32);
+      var im_width = (image_grid[0][0][2] * 32);
+      var im_height = (image_grid[0][0][3] * 32);
       
       // descale x,y
       for (var i = 0; i < bboxes.length; i++) {
-        bboxes[i][1] = (bboxes[i][1] * image_grid[:,:,2]) + image_grid[:,:,0];
-        bboxes[i][2] = (bboxes[i][2] * image_grid[:,:,3]) + image_grid[:,:,1];
-        bboxes[i][6] = (bboxes[i][6] * image_grid[:,:,2]) + image_grid[:,:,0];
-        bboxes[i][7] = (bboxes[i][7] * image_grid[:,:,3]) + image_grid[:,:,1];
+        bboxes[i][1] = (bboxes[i][1] * image_grid[0][0][2]) + image_grid[0][0][0];
+        bboxes[i][2] = (bboxes[i][2] * image_grid[0][0][3]) + image_grid[0][0][1];
+        bboxes[i][6] = (bboxes[i][6] * image_grid[0][0][2]) + image_grid[0][0][0];
+        bboxes[i][7] = (bboxes[i][7] * image_grid[0][0][3]) + image_grid[0][0][1];
       }
       
       // descale width,height
@@ -148,7 +149,7 @@
       return bboxes;
     }
     
-    <!-- Function that takes in an image and returns the split up images -->
+    <!-- Function that performs non max suppression -->
     function nonMaxSuppression(predictions, top_n) {
       var probabilities = [];
       for (var i = 0; i < predictions.length; i++) {
@@ -163,7 +164,7 @@
         first_anchors.push(predictions[i][3]);
         first_anchors.push(predictions[i][4]);
       }
-      first_anchors = tf.tensor(first_anchors, [32*32, 4]);
+      first_anchors = tf.tensor(first_anchors, [predictions.length, 4]);
       
       var second_anchors = [];
       for (var i = 0; i < predictions.length; i++) {
@@ -172,12 +173,9 @@
         second_anchors.push(predictions[i][8]);
         second_anchors.push(predictions[i][9]);
       }
-      second_anchors = tf.tensor(second_anchors, [32*32, 4]);
+      second_anchors = tf.tensor(second_anchors, [predictions.length, 4]);
       
-      var bboxes = tf.concat(
-        [first_anchors,second_anchors],
-        axis=0
-      );
+      var bboxes = tf.concat([first_anchors,second_anchors], 0);
       bboxes = switchXY(bboxes);
       bboxes = selectTop(probabilities, bboxes, top_n);
       bboxes = switchXY(bboxes);
@@ -185,21 +183,18 @@
       return bboxes;
     }
     
-    <!-- Function that takes in an image and returns the split up images -->
+    <!-- Function that switches the x and y values -->
     function switchXY(bboxes) {
-      var x1 = bboxes[:,0].copy();
-      var y1 = bboxes[:,1].copy();
-      var x2 = bboxes[:,2].copy();
-      var y2 = bboxes[:,3].copy();
-      bboxes[:,0] = y1;
-      bboxes[:,1] = x1;
-      bboxes[:,2] = y2;
-      bboxes[:,3] = x2;
+      var x1 = bboxes.slice([0,0],[bboxes.shape[0],1]);
+      var y1 = bboxes.slice([0,1],[bboxes.shape[0],1]);
+      var x2 = bboxes.slice([0,2],[bboxes.shape[0],1]);
+      var y2 = bboxes.slice([0,3],[bboxes.shape[0],1]);
+      bboxes = tf.concat([y1,x1,y2,x2], 1);
       
       return bboxes;
     }
     
-    <!-- Function that takes in an image and returns the split up images -->
+    <!-- Function that selects the top n bounding boxes -->
     function selectTop(probabilities, boxes, top_n) {
       var top_indices = tf.image.nonMaxSuppression(
         boxes = boxes, 
@@ -209,24 +204,37 @@
         scoreThreshold = 0.05
       );
       
+      top_indices = top_indices.dataSync();
+      
       return boxes.gather(top_indices);
     }
-  </script>
-
-  <!-- Helper functions for handling uploaded user images -->
-  <script>
-    function readURL(input) {
-      if (input.files && input.files[0]) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-          getSplitImages(e.target.result);
-        }
-        reader.readAsDataURL(input.files[0]);
+    
+    <!-- Set up image_grid -->
+    var image_grid = [];
+    for (var i = 0; i < 32; i++) {
+      var row = [];
+      for (var j = 0; j < 32; j++) {
+        row.push([0, 0, 256 / 32, 256 / 32]);
       }
+      image_grid.push(row);
     }
   </script>
 
-  <!-- Upload image button -->
-  <input type="file" onchange="readURL(this);" />
+  <!-- Load the image -->
+  <input type="file" id="file-input" accept="image/*" onchange="loadImage(event)">
+  <img id="image" src="" width="256" height="256" style="display: none;"/>
+  <script>
+    function loadImage(event) {
+      var image = document.getElementById('image');
+      image.src = URL.createObjectURL(event.target.files[0]);
+      image.onload = function() {
+        URL.revokeObjectURL(image.src)
+      }
+      image.style.display = '';
+    }
+  </script>
+  
+  <!-- Get the split images -->
+  <button onclick="getSplitImages(document.getElementById('image').src)">Get Split Images</button>
 </body>
 </html>
