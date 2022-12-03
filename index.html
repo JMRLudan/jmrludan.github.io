@@ -8,58 +8,93 @@
   <!-- Load the TensorflowJS library -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
 
-  <!-- Load the model from an online source -->
+  <!-- Load the model from the local folder -->
   <script>
-    const modelUrl = 'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json';
+    const modelUrl = './diceReaderModeltfjs_reduced/model.json';
     let model;
 
     async function loadModel() {
-      model = await tf.loadGraphModel(modelUrl);
+      model = await tf.loadLayersModel(modelUrl);
     }
 
     loadModel();
   </script>
 
-  <!-- Display a video element to show the camera feed -->
-  <video id="camera-feed" autoplay></video>
+  <!-- Display a file input element for the user to select an image -->
+  <input type="file" id="image-file" accept="image/*">
+
+  <!-- Display the selected image -->
+  <div id="image-container">
+    <img id="selected-image">
+  </div>
 
   <!-- Display the classification output -->
   <div id="classification-output">
     <p>Classification: <span id="classification-label"></span></p>
   </div>
 
-  <!-- Run the classification on the camera feed -->
+  <!-- Style the classification label -->
+  <style>
+    #classification-label {
+      font-size: 48px;
+    }
+  </style>
+
+  <!-- Run the classification on the selected image -->
   <script>
-    // Get the video element and the classification label
-    const video = document.getElementById('camera-feed');
+    const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
+
+    // Get the file input and image elements
+    const fileInput = document.getElementById('image-file');
+    const image = document.getElementById('selected-image');
+
+    // Get the classification label
     const output = document.getElementById('classification-label');
 
-    // Get the user's camera and start the video feed
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        video.srcObject = stream;
+    // Function to load the selected image
+    function loadImage() {
+      // Get the selected file
+      const file = fileInput.files[0];
 
-        // Start the classification when the video has loaded
-        video.addEventListener('loadeddata', classifyVideo);
-      });
+      // Create a FileReader to read the file
+      const reader = new FileReader();
 
-    // Function to classify the current frame of the video
-    async function classifyVideo() {
+      // Set the onload callback for the FileReader
+      reader.onload = () => {
+        // Set the src attribute of the image element to the data URL of the file
+        image.src = reader.result;
+      };
+
+      // Read the file as a data URL
+      reader.readAsDataURL(file);
+    }
+
+    // Function to classify the selected image
+    async function classifyImage() {
+      // Wait for the model to be loaded before continuing
+      await loadModel();
+
       // Preprocess the image for the model
-      const image = await tf.browser.fromPixels(video);
-      const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
+      const imageElement = document.getElementById('selected-image');
+      const resizedImage = tf.image.resizeBilinear(imageElement, [224, 224]);
       const normalizedImage = tf.div(tf.sub(resizedImage, 127.5), 127.5);
-
       // Run the classification on the image
       const predictions = await model.predict(normalizedImage.expandDims());
-      const label = predictions.argMax(1).dataSync()[0];
+      const predictedIndex = predictions.argMax(1).dataSync()[0];
+
+      // Find the label that corresponds to the predicted index
+      const label = labels.find((label, index) => index === predictedIndex);
 
       // Display the classification output
       output.innerHTML = label;
-
-      // Continue to classify the video feed in a loop
-      setTimeout(classifyVideo, 1000);
     }
+
+    // Listen for changes to the file input
+    fileInput.addEventListener('change', loadImage);
+
+    // Listen for the image to be loaded
+    image.addEventListener('load', classifyImage);
   </script>
 </body>
 </html>
+     
