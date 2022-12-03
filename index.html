@@ -28,8 +28,17 @@
     <p>Classification: <span id="classification-label"></span></p>
   </div>
 
+  <!-- Style the classification label -->
+  <style>
+    #classification-label {
+      font-size: 48px;
+    }
+  </style>
+
   <!-- Run the classification on the camera feed -->
   <script>
+    const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
+
     // Get the video element and the classification label
     const video = document.getElementById('camera-feed');
     const output = document.getElementById('classification-label');
@@ -55,7 +64,10 @@
 
       // Run the classification on the image
       const predictions = await model.predict(normalizedImage.expandDims());
-      const label = predictions.argMax(1).dataSync()[0];
+      const predictedIndex = predictions.argMax(1).dataSync()[0];
+
+      // Find the label that corresponds to the predicted index
+      const label = labels.find((label, index) => index === predictedIndex);
 
       // Display the classification output
       output.innerHTML = label;
@@ -63,6 +75,4 @@
       // Continue to classify the video feed in a loop
       setTimeout(classifyVideo, 1000);
     }
-  </script>
-</body>
-</html>
+  </
