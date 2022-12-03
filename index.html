@@ -1,9 +1,11 @@
+
+
 <html>
 <head>
-  <title>TensorflowJS Segmentation Classification</title>
+  <title>TensorflowJS Image Classification</title>
 </head>
 <body>
-  <h1>TensorflowJS ImageSegmentationClassification</h1>
+  <h1>TensorflowJS Image Classification</h1>
 
   <!-- Load the TensorflowJS library -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
@@ -18,223 +20,84 @@
     }
 
     loadModel();
-    
-    <!-- Function that loads the image and returns the split images -->
-    async function getSplitImages(image_path) {
-      //Load the image
-      var image = new Image();
-      image.src = image_path;
-      image.onload = function() {
-        //Resize the image to 256x256
-        var canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(image, 0, 0, 256, 256);
-        //Convert the image to a numpy array
-        var imageData = ctx.getImageData(0, 0, 256, 256);
-        var data = imageData.data;
-        var image = [];
-        for (var i = 0; i < data.length; i += 4) {
-          image.push(data[i]/255.0);
-          image.push(data[i+1]/255.0);
-          image.push(data[i+2]/255.0);
-        }
-        //Reshape the image to fit the model
-        image = tf.tensor(image, [1,256,256,3]);
-        //Get the predictions
-        var predictions = model.predict(image);
-        //Process the predictions
-        var bboxes = processPredictions(predictions, [image_path], image_grid);
-        //Split the image
-        var images = splitImage(image_path, bboxes);
-        //Display the images
-        for (var i = 0; i < images.length; i++) {
-          var img = document.createElement('img');
-          img.src = images[i];
-          document.body.appendChild(img);
-        }
-      }
-    }
-    
-    <!-- Function that takes an image and a list of bounding boxes and splits the image into multiple images based on the bounding boxes -->
-    function splitImage(image_path, bboxes) {
-      var image = new Image();
-      image.src = image_path;
-      image.onload = function() {
-        var ratio = image.height / 256;
-        var images = [];
-        for (var i = 0; i < bboxes[image_path].length; i++) {
-          var box = bboxes[image_path][i];
-          var left = Math.max(Math.round((box[0]-8)*ratio),0);
-          var top = Math.max(Math.round((box[1]-8)*ratio),0);
-          var width = Math.min(Math.round((box[2]+16)*ratio),image.width);
-          var height = Math.min(Math.round((box[3]+16)*ratio),image.height);
-          //Crop the image
-          var crop_canvas = document.createElement('canvas');
-          crop_canvas.width = width;
-          crop_canvas.height = height;
-          var crop_ctx = crop_canvas.getContext('2d');
-          crop_ctx.drawImage(image, left, top, width, height, 0, 0, width, height);
-          //Resize the image to 224x224
-          var resize_canvas = document.createElement('canvas');
-          resize_canvas.width = 224;
-          resize_canvas.height = 224;
-          var resize_ctx = resize_canvas.getContext('2d');
-          resize_ctx.drawImage(crop_canvas, 0, 0, 224, 224);
-          //Add the image to the list
-          images.push(resize_canvas.toDataURL());
-        }
-        return images;
-      }
-    }
-    
-    <!-- Function that processes the predictions -->
-    function processPredictions(predictions, image_ids, image_grid) {
-      var bboxes = {};
-      
-      for (var i = 0; i < image_ids.length; i++) {
-        predictions[i] = predictionToBbox(predictions[i], image_grid);
-        bboxes[image_ids[i]] = nonMaxSuppression(predictions[i], 100);
-        
-        // back to coco shape
-        for (var j = 0; j < bboxes[image_ids[i]].length; j++) {
-          bboxes[image_ids[i]][j][2] = bboxes[image_ids[i]][j][2] - bboxes[image_ids[i]][j][0];
-          bboxes[image_ids[i]][j][3] = bboxes[image_ids[i]][j][3] - bboxes[image_ids[i]][j][1];
-        }
-      }
-      
-      return bboxes;
-    }
-    
-    <!-- Function that converts the predictions to bounding boxes -->
-    function predictionToBbox(bboxes, image_grid) {
-      bboxes = bboxes.slice();
-      
-      var im_width = (image_grid[0][0][2] * 32);
-      var im_height = (image_grid[0][0][3] * 32);
-      
-      // descale x,y
-      for (var i = 0; i < bboxes.length; i++) {
-        bboxes[i][1] = (bboxes[i][1] * image_grid[0][0][2]) + image_grid[0][0][0];
-        bboxes[i][2] = (bboxes[i][2] * image_grid[0][0][3]) + image_grid[0][0][1];
-        bboxes[i][6] = (bboxes[i][6] * image_grid[0][0][2]) + image_grid[0][0][0];
-        bboxes[i][7] = (bboxes[i][7] * image_grid[0][0][3]) + image_grid[0][0][1];
-      }
-      
-      // descale width,height
-      for (var i = 0; i < bboxes.length; i++) {
-        bboxes[i][3] = bboxes[i][3] * im_width;
-        bboxes[i][4] = bboxes[i][4] * im_height;
-        bboxes[i][8] = bboxes[i][8] * im_width;
-        bboxes[i][9] = bboxes[i][9] * im_height;
-      }
-      
-      // centre x,y to top left x,y
-      for (var i = 0; i < bboxes.length; i++) {
-        bboxes[i][1] = bboxes[i][1] - (bboxes[i][3] / 2);
-        bboxes[i][2] = bboxes[i][2] - (bboxes[i][4] / 2);
-        bboxes[i][6] = bboxes[i][6] - (bboxes[i][8] / 2);
-        bboxes[i][7] = bboxes[i][7] - (bboxes[i][9] / 2);
-      }
-      
-      // width,heigth to x_max,y_max
-      for (var i = 0; i < bboxes.length; i++) {
-        bboxes[i][3] = bboxes[i][1] + bboxes[i][3];
-        bboxes[i][4] = bboxes[i][2] + bboxes[i][4];
-        bboxes[i][8] = bboxes[i][6] + bboxes[i][8];
-        bboxes[i][9] = bboxes[i][7] + bboxes[i][9];
-      }
-      
-      return bboxes;
-    }
-    
-    <!-- Function that performs non max suppression -->
-    function nonMaxSuppression(predictions, top_n) {
-      var probabilities = [];
-      for (var i = 0; i < predictions.length; i++) {
-        probabilities.push(predictions[i][0]);
-        probabilities.push(predictions[i][5]);
-      }
-      
-      var first_anchors = [];
-      for (var i = 0; i < predictions.length; i++) {
-        first_anchors.push(predictions[i][1]);
-        first_anchors.push(predictions[i][2]);
-        first_anchors.push(predictions[i][3]);
-        first_anchors.push(predictions[i][4]);
-      }
-      first_anchors = tf.tensor(first_anchors, [predictions.length, 4]);
-      
-      var second_anchors = [];
-      for (var i = 0; i < predictions.length; i++) {
-        second_anchors.push(predictions[i][6]);
-        second_anchors.push(predictions[i][7]);
-        second_anchors.push(predictions[i][8]);
-        second_anchors.push(predictions[i][9]);
-      }
-      second_anchors = tf.tensor(second_anchors, [predictions.length, 4]);
-      
-      var bboxes = tf.concat([first_anchors,second_anchors], 0);
-      bboxes = switchXY(bboxes);
-      bboxes = selectTop(probabilities, bboxes, top_n);
-      bboxes = switchXY(bboxes);
-      
-      return bboxes;
-    }
-    
-    <!-- Function that switches the x and y values -->
-    function switchXY(bboxes) {
-      var x1 = bboxes.slice([0,0],[bboxes.shape[0],1]);
-      var y1 = bboxes.slice([0,1],[bboxes.shape[0],1]);
-      var x2 = bboxes.slice([0,2],[bboxes.shape[0],1]);
-      var y2 = bboxes.slice([0,3],[bboxes.shape[0],1]);
-      bboxes = tf.concat([y1,x1,y2,x2], 1);
-      
-      return bboxes;
-    }
-    
-    <!-- Function that selects the top n bounding boxes -->
-    function selectTop(probabilities, boxes, top_n) {
-      var top_indices = tf.image.nonMaxSuppression(
-        boxes = boxes, 
-        scores = probabilities, 
-        maxOutputSize = top_n, 
-        iouThreshold = 0.05,
-        scoreThreshold = 0.05
-      );
-      
-      top_indices = top_indices.dataSync();
-      
-      return boxes.gather(top_indices);
-    }
-    
-    <!-- Set up image_grid -->
-    var image_grid = [];
-    for (var i = 0; i < 32; i++) {
-      var row = [];
-      for (var j = 0; j < 32; j++) {
-        row.push([0, 0, 256 / 32, 256 / 32]);
-      }
-      image_grid.push(row);
-    }
   </script>
 
-  <!-- Load the image -->
-  <input type="file" id="file-input" accept="image/*" onchange="loadImage(event)">
-  <img id="image" src="" width="256" height="256" style="display: none;"/>
-  <script>
-    function loadImage(event) {
-      var image = document.getElementById('image');
-      image.src = URL.createObjectURL(event.target.files[0]);
-      image.onload = function() {
-        URL.revokeObjectURL(image.src)
-      }
-      image.style.display = '';
+  <!-- Display a file input element for the user to select an image -->
+  <input type="file" id="image-file" accept="image/*">
+
+  <!-- Display the selected image -->
+  <div id="image-container">
+    <img id="selected-image">
+  </div>
+
+  <!-- Display the classification output -->
+  <div id="classification-output">
+    <p>Classification: <span id="classification-label"></span></p>
+  </div>
+
+  <!-- Style the classification label -->
+  <style>
+    #classification-label {
+      font-size: 48px;
     }
+  </style>
+
+  <!-- Run the classification on the selected image -->
+  <script>
+    const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
+
+    // Get the file input and image elements
+    const fileInput = document.getElementById('image-file');
+    const image = document.getElementById('selected-image');
+
+    // Get the classification label
+    const output = document.getElementById('classification-label');
+
+    // Function to load the selected image
+    function loadImage() {
+      // Get the selected file
+      const file = fileInput.files[0];
+
+      // Create a FileReader to read the file
+      const reader = new FileReader();
+
+      // Set the onload callback for the FileReader
+      reader.onload = () => {
+        // Set the src attribute of the image element to the data URL of the file
+        image.src = reader.result;
+      };
+
+      // Read the file as a data URL
+      reader.readAsDataURL(file);
+    }
+
+    // Function to classify the selected image
+    async function classifyImage() {
+      // Wait for the model to be loaded before continuing
+      await loadModel();
+
+      // Preprocess the image for the model
+      const imageElement = document.getElementById('selected-image');
+      const imageTensor = tf.browser.fromPixels(imageElement);
+      const castImageTensor = tf.cast(imageTensor, 'float32');
+      const resizedImage = tf.image.resizeBilinear(castImageTensor, [224, 224]);
+      const normalizedImage = tf.div(tf.sub(resizedImage, 127.5), 127.5);
+      // Run the classification on the image
+      const predictions = await model.predict(normalizedImage.expandDims());
+      const predictedIndex = predictions.argMax(1).dataSync()[0];
+
+      // Find the label that corresponds to the predicted index
+      const label = labels.find((label, index) => index === predictedIndex);
+
+      // Display the classification output
+      output.innerHTML = label;
+    }
+
+    // Listen for changes to the file input
+    fileInput.addEventListener('change', loadImage);
+
+    // Listen for the image to be loaded
+    image.addEventListener('load', classifyImage);
   </script>
-  
-  <!-- Get the split images -->
-  <button onclick="getSplitImages(document.getElementById('image').src)">Get Split Images</button>
 </body>
 </html>
