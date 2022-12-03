@@ -8,13 +8,13 @@
   <!-- Load the TensorflowJS library -->
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
 
-  <!-- Load the model from the local folder -->
+  <!-- Load the model from an online source -->
   <script>
-    const modelUrl = './diceReaderModeltfjs_reduced/model.json';
+    const modelUrl = 'https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json';
     let model;
 
     async function loadModel() {
-      model = await tf.loadLayersModel(modelUrl);
+      model = await tf.loadGraphModel(modelUrl);
     }
 
     loadModel();
@@ -28,17 +28,8 @@
     <p>Classification: <span id="classification-label"></span></p>
   </div>
 
-  <!-- Style the classification label -->
-  <style>
-    #classification-label {
-      font-size: 48px;
-    }
-  </style>
-
   <!-- Run the classification on the camera feed -->
   <script>
-    const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
-
     // Get the video element and the classification label
     const video = document.getElementById('camera-feed');
     const output = document.getElementById('classification-label');
@@ -54,9 +45,6 @@
 
     // Function to classify the current frame of the video
     async function classifyVideo() {
-      // Wait for the model to be loaded before continuing
-      await loadModel();
-
       // Preprocess the image for the model
       const image = await tf.browser.fromPixels(video);
       const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
@@ -64,10 +52,7 @@
 
       // Run the classification on the image
       const predictions = await model.predict(normalizedImage.expandDims());
-      const predictedIndex = predictions.argMax(1).dataSync()[0];
-
-      // Find the label that corresponds to the predicted index
-      const label = labels.find((label, index) => index === predictedIndex);
+      const label = predictions.argMax(1).dataSync()[0];
 
       // Display the classification output
       output.innerHTML = label;
@@ -76,6 +61,5 @@
       setTimeout(classifyVideo, 1000);
     }
   </script>
-
 </body>
 </html>
