@@ -81,7 +81,7 @@
       const imageTensor = tf.browser.fromPixels(imageElement);
       const castImageTensor = tf.cast(imageTensor, 'float32');
       const resizedImage = tf.image.resizeBilinear(castImageTensor, [224, 224]);
-      const normalizedImage = tf.div(tf.sub(resizedImage, 127.5), 127.5);
+      const normalizedImage = tf.div(resizedImage, 255);
       // Run the classification on the image
       const predictions = await model.predict(normalizedImage.expandDims());
       const predictedIndex = predictions.argMax(1).dataSync()[0];
