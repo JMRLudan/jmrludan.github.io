@@ -10,7 +10,7 @@
 
   <!-- Load the model from the local folder -->
   <script>
-    const modelUrl = './diceReaderModeltfjs_reduced/model.json';
+    const modelUrl = './diceModel/model.json';
     let model;
 
     async function loadModel() {
@@ -45,6 +45,9 @@
 
     // Function to classify the current frame of the video
     async function classifyVideo() {
+      // Wait for the model to be loaded before continuing
+      await loadModel();
+
       // Preprocess the image for the model
       const image = await tf.browser.fromPixels(video);
       const resizedImage = tf.image.resizeBilinear(image, [224, 224]);
