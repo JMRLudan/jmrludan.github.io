@@ -42,6 +42,7 @@
       <input type="file" id="image-file" accept="image/*">
     
       <!-- Display the selected image -->
+      <h2> Current Dice sum: <span id="diceSum"></span></h2>
       <div id="image-container">
         <img id="selected-image">
         <div id="cropped-images">
@@ -87,6 +88,7 @@
         // Get the file input and image elements
         const fileInput = document.getElementById('image-file');
         const image = document.getElementById('selected-image');
+        const diceSum = document.getElementById('diceSum');
     
         // Get the classification label
         //const output = document.getElementById('classification-label');
@@ -115,6 +117,11 @@
           const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
           // Wait for the model to be loaded before continuing
           await loadModels();
+          
+          // Set dice sum to 0
+          diceSum.innerHTML = 0;
+          let diceSumInt = 0;
+
     
           // Preprocess the image for the model, we want to crop it square then resize it to 256x256
           const imageElement = document.getElementById('selected-image');
@@ -157,6 +164,10 @@
                     const predictedIndex = predictions.argMax(1).dataSync()[0];
                     const label = labels.find((label, index) => index === predictedIndex);
                     figureCaption.innerHTML = label;
+
+                    //add to dice sum
+                    diceSumInt += parseInt(label);
+                    diceSum.innerHTML = diceSumInt;
                 }
             }
         }
