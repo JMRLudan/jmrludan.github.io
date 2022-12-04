@@ -1,119 +1,320 @@
-
-
 <html>
-<head>
-  <title>TensorflowJS Image Classification</title>
-</head>
-<body>
-  <h1>TensorflowJS Image Classification</h1>
+    <head>
+      <title>TensorflowJS Image Classification</title>
+    </head>
+    <body>
+      <h1>TensorflowJS Image Classification</h1>
+    
+      <!-- Load the TensorflowJS library -->
+      <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    
+      <!-- Load the model from the local folder -->
+      <script>
+        const faceModelUrl = './diceDetectionModeltfjs_reduced/model.json';
+        let faceModel;
+        const readerModelUrl = './diceReaderModeltfjs_reduced/model.json';
+        let readerModel;
+    
+        async function loadModels() {
+            faceModel = await tf.loadLayersModel(faceModelUrl);
+            readerModel = await tf.loadLayersModel(readerModelUrl)
+        }
+    
+        loadModels();
+      </script>
+    
+      <!-- Display a file input element for the user to select an image -->
+      <input type="file" id="image-file" accept="image/*">
+    
+      <!-- Display the selected image -->
+      <div id="image-container">
+        <img id="selected-image">
+        <div id="cropped-images">
 
-  <!-- Load the TensorflowJS library -->
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+        </div>
+      </div>
+    
+      <!-- Display the classification output -->
+      <!-- <div id="classification-output">
+        <p>Classification: <span id="classification-label"></span></p>
+      </div> -->
+    
+      <!-- Style the classification label -->
+      <style>
+        #image-file {
+          display: inline-block;
+          padding: 0.5em 1em;
+          border: none;
+          background: #337ab7;
+          color: #fff;
+          font-size: 16px;
+          cursor: pointer;
+        }
+    
+        #classification-label {
+          font-size: 48px;
+        }
+    
+        /* Set the maximum width and height of the image */
+        #selected-image {
+          max-width: 100%;
+          max-height: 300px;
+        }
+      </style>
+    
+      <!-- Run the classification on the selected image -->
+      <script>
 
-  <!-- Load the model from the local folder -->
-  <script>
-    const modelUrl = './diceReaderModeltfjs_reduced/model.json';
-    let model;
+        // Get the file input and image elements
+        const fileInput = document.getElementById('image-file');
+        const image = document.getElementById('selected-image');
+    
+        // Get the classification label
+        //const output = document.getElementById('classification-label');
+        const croppedImages = document.getElementById('cropped-images');
+    
+        // Function to load the selected image
+        function loadImage() {
+          // Get the selected file
+          const file = fileInput.files[0];
+    
+          // Create a FileReader to read the file
+          const reader = new FileReader();
+    
+          // Set the onload callback for the FileReader
+          reader.onload = () => {
+            // Set the src attribute of the image element to the data URL of the file
+            image.src = reader.result;
+          };
+    
+          // Read the file as a data URL
+          reader.readAsDataURL(file);
+        }
+    
+        // Function to classify the selected image
+        async function classifyImage() {
+          const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
+          // Wait for the model to be loaded before continuing
+          await loadModels();
+    
+          // Preprocess the image for the model
+          const imageElement = document.getElementById('selected-image');
+          const imageTensor = tf.browser.fromPixels(imageElement);
+          const castImageTensor = tf.cast(imageTensor, 'float32');
+          const resizedImage = tf.image.resizeBilinear(castImageTensor, [256, 256]);
+          const normalizedImage = tf.div(resizedImage, 255);
+          // Run the classification on the image
+          const predictions = await faceModel.predict(normalizedImage.expandDims());
+          const processedPred = await process_prediction(predictions.reshape([32,32,10]))
+    
+          // Display the classification output
+          const newCroppedImages = await cropImage(image, processedPred);
+          //remove previous cropped images
+            while (croppedImages.firstChild) {
+                croppedImages.removeChild(croppedImages.firstChild);
+            }
 
-    async function loadModel() {
-      model = await tf.loadLayersModel(modelUrl);
+            //Classification loop
+            for (const img of newCroppedImages) {
+                console.log(img[1])
+                console.log(img[2])
+                const imgElement = document.createElement('img');
+                const figureElement = document.createElement('figure');
+                const figureCaption = document.createElement('figcaption');
+                imgElement.src = img[0];
+                imgElement.width = img[1];
+                imgElement.height = img[2];
+                croppedImages.appendChild(figureElement);
+                figureElement.appendChild(imgElement);
+                figureElement.appendChild(figureCaption);
+
+                //predict the number on the cropped image
+                imgElement.onload = async function() {
+                    const imageTensor = tf.browser.fromPixels(imgElement);
+                    const castImageTensor = tf.cast(imageTensor, 'float32');
+                    const resizedImage = tf.image.resizeBilinear(castImageTensor, [224, 224]);
+                    const normalizedImage = tf.div(resizedImage, 255);
+                    const predictions = await readerModel.predict(normalizedImage.expandDims());
+                    const predictedIndex = predictions.argMax(1).dataSync()[0];
+                    const label = labels.find((label, index) => index === predictedIndex);
+                    figureCaption.innerHTML = label;
+                }
+            }
+        }
+
+        function cropImage(image, coordinates) {
+  // Create an empty array to store the cropped images
+  var croppedImages = [];
+  var ratio = image.naturalWidth / 255.0
+
+  // Loop through the coordinates and crop the image using the coordinates
+  console.log(coordinates)
+  for (var i = 0; i < coordinates.length; i++) {
+    var x1 = (coordinates[i].split(",")[0])* parseInt(ratio);
+    var y1 = (coordinates[i].split(",")[1])* parseInt(ratio);
+    var x2 = (coordinates[i].split(",")[2])* parseInt(ratio);
+    var y2 = (coordinates[i].split(",")[3])* parseInt(ratio);
+    console.log(x1, y1, x2, y2)
+
+
+    // Create a temporary canvas to crop the image
+    var tempCanvas = document.createElement('canvas');
+    var tempContext = tempCanvas.getContext('2d');
+
+    // Set the canvas size to the cropped area
+    tempCanvas.width = x2-x1;
+    tempCanvas.height = y2-y1;
+8
+    // Draw the cropped area of the image onto the canvas
+    tempContext.drawImage(image, x2-(x2 - x1)*0.3, y2-(y2 - y1)*0.3,
+    ratio*36+(x2 - x1), ratio*36+(y2 - y1), 0, 0, 1.5*(x2 - x1), 1.5*(y2 - y1));
+
+    // Get the data URL of the cropped image and add it to the array
+    var dataURL = tempCanvas.toDataURL('image/jpeg', 1.0);
+    croppedImages.push([dataURL, tempCanvas.width, tempCanvas.height]);
+  }
+
+  // Return the array of cropped images
+  return croppedImages;
+}
+
+
+        function prediction_to_bbox(bboxes, image_grid) {
+    //Instead of using python slicing, we instead use the tensorflow slice method
+    im_width = tf.slice(image_grid, [0,0,2], [32,32,1])
+    im_height = tf.slice(image_grid, [0,0,3], [32,32,1])
+    //We use the tensorflow multiply method to multiply the tensor by a scalar
+    im_width = tf.mul(im_width, 32)
+    im_height = tf.mul(im_height, 32)
+    bboxes_1 = tf.slice(bboxes, [0,0,1], [32,32,1])
+    bboxes_2 = tf.slice(bboxes, [0,0,2], [32,32,1])
+    bboxes_6 = tf.slice(bboxes, [0,0,6], [32,32,1])
+    bboxes_7 = tf.slice(bboxes, [0,0,7], [32,32,1])
+    //We use the tensorflow multiply method to multiply the tensor by a tensor
+    bboxes_1 = tf.mul(bboxes_1, tf.slice(image_grid, [0,0,2], [32,32,1]))
+    bboxes_2 = tf.mul(bboxes_2, tf.slice(image_grid, [0,0,3], [32,32,1]))
+    bboxes_6 = tf.mul(bboxes_6, tf.slice(image_grid, [0,0,2], [32,32,1]))
+    bboxes_7 = tf.mul(bboxes_7, tf.slice(image_grid, [0,0,3], [32,32,1]))
+    //We use the tensorflow add method to add the tensor by a tensor
+    bboxes_1 = tf.add(bboxes_1, tf.slice(image_grid, [0,0,0], [32,32,1]))
+    bboxes_2 = tf.add(bboxes_2, tf.slice(image_grid, [0,0,1], [32,32,1]))
+    bboxes_6 = tf.add(bboxes_6, tf.slice(image_grid, [0,0,0], [32,32,1]))
+    bboxes_7 = tf.add(bboxes_7, tf.slice(image_grid, [0,0,1], [32,32,1]))
+    //We use the tensorflow multiply method to multiply the tensor by a tensor
+    bboxes_3 = tf.mul(tf.slice(bboxes, [0,0,3], [32,32,1]), im_width)
+    bboxes_4 = tf.mul(tf.slice(bboxes, [0,0,4], [32,32,1]), im_height)
+    bboxes_8 = tf.mul(tf.slice(bboxes, [0,0,8], [32,32,1]), im_width)
+    bboxes_9 = tf.mul(tf.slice(bboxes, [0,0,9], [32,32,1]), im_height)
+    //We use the tensorflow divide method to divide the tensor by a scalar
+    bboxes_3 = tf.div(bboxes_3, 2)
+    bboxes_4 = tf.div(bboxes_4, 2)
+    bboxes_8 = tf.div(bboxes_8, 2)
+    bboxes_9 = tf.div(bboxes_9, 2)
+    //We use the tensorflow subtract method to subtract the tensor by a tensor
+    bboxes_1 = tf.sub(bboxes_1, bboxes_3)
+    bboxes_2 = tf.sub(bboxes_2, bboxes_4)
+    bboxes_6 = tf.sub(bboxes_6, bboxes_8)
+    bboxes_7 = tf.sub(bboxes_7, bboxes_9)
+    //We use the tensorflow add method to add the tensor by a tensor
+    bboxes_3 = tf.add(bboxes_1, bboxes_3)
+    bboxes_4 = tf.add(bboxes_2, bboxes_4)
+    bboxes_8 = tf.add(bboxes_6, bboxes_8)
+    bboxes_9 = tf.add(bboxes_7, bboxes_9)
+    //We include the other bboxes as is
+    bboxes_0 = tf.slice(bboxes, [0,0,0], [32,32,1])
+    bboxes_5 = tf.slice(bboxes, [0,0,5], [32,32,1])
+    //We use the tensorflow concat method to concatenate the tensors
+    bboxes = tf.concat([bboxes_0, bboxes_1, bboxes_2, bboxes_3, bboxes_4, bboxes_5, bboxes_6, bboxes_7, bboxes_8, bboxes_9], 2)
+    return bboxes
+    }
+    //This function takes in a (32,32,10) tensor
+    async function process_prediction(prediction) {
+        image_grid = []
+        cell = [0, 0, 256 / 32, 256 / 32]
+        for (var i = 0; i < 32; i++) {
+            image_grid.push([])
+            for (var j = 0; j < 32; j++) {
+                image_grid[i].push([])
+                for (var k = 0; k < 4; k++) {
+                    image_grid[i][j].push(cell[k])
+                }
+                cell[0] = cell[0] + cell[2]
+            }
+            cell[0] = 0
+            cell[1] = cell[1] + cell[3]
+        }
+        //We convert the image_grid into a tf.tensor
+        image_grid = tf.tensor(image_grid)
+        //We get the bounding boxes
+        var boxes = prediction_to_bbox(prediction, image_grid);
+        //We get the non max suppression
+        var boxes = await non_max_suppression(boxes, 10);
+        //We return the bounding boxes
+        return boxes;
+    }
+    //This function takes in a (32,32,10) tensor and a top_n
+    async function non_max_suppression(predictions, top_n) {
+        //We get the probabilities
+        var probabilities = tf.concat([tf.slice(predictions, [0,0,0], [32,32,1]).reshape([1024]), tf.slice(predictions, [0,0,5], [32,32,1]).reshape([1024])], 0);
+        //We get the first anchors
+        var first_anchors = tf.reshape(tf.slice(predictions, [0,0,1], [32,32,4]), [32*32, 4]);
+        //We get the second anchors
+        var second_anchors = tf.reshape(tf.slice(predictions, [0,0,6], [32,32,4]), [32*32, 4]);
+        //We concat the anchors
+        var bboxes = tf.concat([first_anchors, second_anchors], 0);
+        //We switch the x and y
+        var bboxes = switch_x_y(bboxes);
+        //We get the top bounding boxes
+        var bboxesNew = await select_top(probabilities, bboxes, top_n);
+        //We return the bounding boxes
+        var bboxesNew = switch_x_y_array(bboxesNew);
+        return bboxesNew;
+    }
+    async function select_top(probabilities, bboxes, top_n) {
+        //We get the top indices
+        var top_indices = await tf.image.nonMaxSuppressionAsync(bboxes, probabilities.reshape([2048]), top_n, 0.5, 0.5);
+        //We get the top indices
+        var top_indices = top_indices.dataSync();
+        var topBboxes = [];
+        //We loop through the top indices
+        for (var i = 0; i < top_indices.length; i++) {
+            //We get the top bounding box
+            var topBbox = bboxes.dataSync()[top_indices[i]*4] + "," + bboxes.dataSync()[top_indices[i]*4+1] + "," + bboxes.dataSync()[top_indices[i]*4+2] + "," + bboxes.dataSync()[top_indices[i]*4+3];
+            //We append the top bounding box
+            topBboxes.push(topBbox);
+        }
+        //We return the top bounding boxes and the top probabilities
+        return topBboxes;
     }
 
-    loadModel();
-  </script>
-
-  <!-- Display a file input element for the user to select an image -->
-  <input type="file" id="image-file" accept="image/*">
-
-  <!-- Display the selected image -->
-  <div id="image-container">
-    <img id="selected-image">
-  </div>
-
-  <!-- Display the classification output -->
-  <div id="classification-output">
-    <p>Classification: <span id="classification-label"></span></p>
-  </div>
-
-  <!-- Style the classification label -->
-  <style>
-    #image-file {
-      display: inline-block;
-      padding: 0.5em 1em;
-      border: none;
-      background: #337ab7;
-      color: #fff;
-      font-size: 16px;
-      cursor: pointer;
+    function switch_x_y(bboxes) {
+        //We switch the x and y
+        var bboxes = tf.concat([tf.slice(bboxes, [0,1], [bboxes.shape[0],1]), tf.slice(bboxes, [0,0], [bboxes.shape[0],1]), tf.slice(bboxes, [0,3], [bboxes.shape[0],1]), tf.slice(bboxes, [0,2], [bboxes.shape[0],1])], 1);
+        //We return the bounding boxes
+        return bboxes;
     }
 
-    #classification-label {
-      font-size: 48px;
+    function switch_x_y_array(bboxes) {
+        //We loop through the bounding boxes
+        for (var i = 0; i < bboxes.length; i++) {
+            //We split the bounding box
+            var bbox = bboxes[i].split(",");
+            //We switch the x and y
+            var bbox = bbox[1] + "," + bbox[0] + "," + bbox[3] + "," + bbox[2];
+            //We set the bounding box
+            bboxes[i] = bbox;
+        }
+        //We return the bounding boxes
+        return bboxes;
     }
 
-    /* Set the maximum width and height of the image */
-    #selected-image {
-      max-width: 100%;
-      max-height: 300px;
-    }
-  </style>
 
-  <!-- Run the classification on the selected image -->
-  <script>
-    const labels = ['0', '1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '2', '20', '3', '30', '4', '40', '5', '50', '6', '60', '7', '70', '8', '80', '9', '90'];
-
-    // Get the file input and image elements
-    const fileInput = document.getElementById('image-file');
-    const image = document.getElementById('selected-image');
-
-    // Get the classification label
-    const output = document.getElementById('classification-label');
-
-    // Function to load the selected image
-    function loadImage() {
-      // Get the selected file
-      const file = fileInput.files[0];
-
-      // Create a FileReader to read the file
-      const reader = new FileReader();
-
-      // Set the onload callback for the FileReader
-      reader.onload = () => {
-        // Set the src attribute of the image element to the data URL of the file
-        image.src = reader.result;
-      };
-
-      // Read the file as a data URL
-      reader.readAsDataURL(file);
-    }
-
-    // Function to classify the selected image
-    async function classifyImage() {
-      // Wait for the model to be loaded before continuing
-      await loadModel();
-
-      // Preprocess the image for the model
-      const imageElement = document.getElementById('selected-image');
-      const imageTensor = tf.browser.fromPixels(imageElement);
-      const castImageTensor = tf.cast(imageTensor, 'float32');
-      const resizedImage = tf.image.resizeBilinear(castImageTensor, [224, 224]);
-      const normalizedImage = tf.div(resizedImage, 255);
-      // Run the classification on the image
-      const predictions = await model.predict(normalizedImage.expandDims());
-      const predictedIndex = predictions.argMax(1).dataSync()[0];
-
-      // Find the label that corresponds to the predicted index
-      const label = labels.find((label, index) => index === predictedIndex);
-
-      // Display the classification output
-      output.innerHTML = label;
-    }
-
-    // Listen for changes to the file input
-    fileInput.addEventListener('change', loadImage);
-
-    // Listen for the image to be loaded
-    image.addEventListener('load', classifyImage);
-  </script>
-</body>
-</html>
+    
+        // Listen for changes to the file input
+        fileInput.addEventListener('change', loadImage);
+    
+        // Listen for the image to be loaded
+        image.addEventListener('load', classifyImage);
+      </script>
+    </body>
+    </html>
