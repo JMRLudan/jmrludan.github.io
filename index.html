@@ -1,9 +1,11 @@
 <html>
     <head>
-      <title>TensorflowJS Image Classification</title>
+      <title>TensorflowJS Dice Reader</title>
     </head>
     <body>
-      <h1>TensorflowJS Image Classification</h1>
+      <h1>TensorflowJS Dice Reader</h1>
+
+      <img src="exampleBanner.png" id="sampleImage"></img>
     
       <!-- Load the TensorflowJS library -->
       <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
@@ -22,6 +24,19 @@
     
         loadModels();
       </script>
+
+      <p>
+        This web app demonstrates the use of TensorflowJS to locally classify images of DND dice.
+        Upon uploading an image, the image is passed to a Yolov3 implementation which splits up the dice.
+        Another model, based on a finetuned MobileNetV2, then classifies the dice.
+
+        <br></br>
+        The model works best when given a <b>square</b> image on a <b>white</b> background, with a <b>top down</b> view
+
+        <br></br>
+        Note for iPhones: The model works best when you take a square picture using the camera app instead of using the "take photo" feature.
+
+      </p>
     
       <!-- Display a file input element for the user to select an image -->
       <input type="file" id="image-file" accept="image/*">
@@ -60,6 +75,10 @@
           max-width: 100%;
           max-height: 300px;
         }
+        #sampleImage {
+          max-width: 100%;
+          max-height: 150px;
+        }
       </style>
     
       <!-- Run the classification on the selected image -->
@@ -97,7 +116,7 @@
           // Wait for the model to be loaded before continuing
           await loadModels();
     
-          // Preprocess the image for the model
+          // Preprocess the image for the model, we want to crop it square then resize it to 256x256
           const imageElement = document.getElementById('selected-image');
           const imageTensor = tf.browser.fromPixels(imageElement);
           const castImageTensor = tf.cast(imageTensor, 'float32');
