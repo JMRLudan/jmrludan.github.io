@@ -8,7 +8,7 @@
       <img src="exampleBanner.png" id="sampleImage"></img>
     
       <!-- Load the TensorflowJS library -->
-      <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.1.0/dist/tf.min.js"></script>
     
       <!-- Load the model from the local folder -->
       <script>
@@ -127,10 +127,24 @@
           const imageElement = document.getElementById('selected-image');
           const imageTensor = tf.browser.fromPixels(imageElement);
           const castImageTensor = tf.cast(imageTensor, 'float32');
-          const resizedImage = tf.image.resizeBilinear(castImageTensor, [256, 256]);
-          const normalizedImage = tf.div(resizedImage, 255);
+          //resize so that the smallest axis is 256
+          let imageWidth = imageTensor.shape[1];
+          let imageHeight = imageTensor.shape[0];
+          if (imageWidth > imageHeight) {
+            imageHeight = 256 * imageHeight / imageWidth;
+            imageWidth = 256;
+            imageHeight = Math.round(imageHeight);
+          } else {
+            imageWidth = 256 * imageWidth / imageHeight;
+            imageHeight = 256;
+            imageWidth = Math.round(imageWidth);
+          }
+          const resizedImage = tf.image.resizeBilinear(castImageTensor, [imageHeight, imageWidth]);
+          //crop to 256x256 using the center
+          const croppedImage = tf.image.cropAndResize(resizedImage.expandDims(0), [[0.5 - 256 / 2 / imageWidth, 0.5 - 256 / 2 / imageHeight, 0.5 + 256 / 2 / imageWidth, 0.5 + 256 / 2 / imageHeight]], [0], [256, 256]); 
+          const normalizedImage = tf.div(croppedImage, 255);
           // Run the classification on the image
-          const predictions = await faceModel.predict(normalizedImage.expandDims());
+          const predictions = await faceModel.predict(normalizedImage);
           const processedPred = await process_prediction(predictions.reshape([32,32,10]))
     
           // Display the classification output
