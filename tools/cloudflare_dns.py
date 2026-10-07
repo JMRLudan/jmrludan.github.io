@@ -156,11 +156,19 @@ def main():
     ap.add_argument("--zone", help="limit to one zone")
     args = ap.parse_args()
 
-    token = os.environ.get("CLOUDFLARE_API_TOKEN")
+    token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
     if not token:
         sys.exit("CLOUDFLARE_API_TOKEN is not set")
     cf = CF(token, dry_run=args.dry_run or args.check)
-    cf.call("GET", "/user/tokens/verify")
+    try:
+        cf.call("GET", "/user/tokens/verify")
+    except SystemExit as e:
+        sys.exit(
+            f"{e}\n\nCloudflare rejected the credential. This script needs an *API Token* "
+            "(Cloudflare dashboard > My Profile > API Tokens > Create Token), not the "
+            "account's Global API Key. Make sure the full token was copied and that it has "
+            "Zone:Read, DNS:Edit and Dynamic Redirect:Edit on the three zones."
+        )
 
     zones = [PRIMARY] + REDIRECT_ZONES
     if args.zone:
