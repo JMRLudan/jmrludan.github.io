@@ -26,7 +26,7 @@ Source for [jmrludan.com](https://jmrludan.com), hosted on GitHub Pages from the
 
 ## Domain / DNS
 
-DNS for `jmrludan.com`, `joshludan.com` and `raccoon.baby` is managed on Cloudflare (registrar stays Squarespace; only the nameservers point at Cloudflare). `tools/cloudflare_dns.py` is the source of truth for the records and is safe to re-run:
+DNS for `jmrludan.com` and `joshludan.com` is managed on Cloudflare (registrar stays Squarespace; only the nameservers point at Cloudflare). `tools/cloudflare_dns.py` is the source of truth for the records and is safe to re-run:
 
 ```
 export CLOUDFLARE_API_TOKEN=...     # or set it in the Claude Code environment settings
@@ -38,9 +38,9 @@ python3 tools/cloudflare_dns.py              # apply
 What it enforces:
 
 - `jmrludan.com`: GitHub Pages `A`/`AAAA` records on the apex and `www` CNAME to `jmrludan.github.io`, all DNS-only (grey cloud) so GitHub issues the HTTPS certificate itself. `CNAME` in this repo tells Pages the domain.
-- `joshludan.com` and `raccoon.baby`: a proxied placeholder record plus a Cloudflare redirect rule that 301s every URL to the same path on `https://jmrludan.com`.
+- `joshludan.com`: a proxied placeholder record plus a Cloudflare redirect rule that 301s every URL to the same path on `https://jmrludan.com`.
 - It never touches MX, TXT or other email-related records.
 
-The token needs `Zone > Zone > Read`, `Zone > DNS > Edit` and `Zone > Dynamic Redirect > Edit` on those three zones.
+The token needs `Zone > Zone > Read`, `Zone > DNS > Edit` and `Zone > Dynamic Redirect > Edit` on both zones.
 
 After the records are in place, enable **Enforce HTTPS** in the repo's Pages settings once GitHub shows the certificate as issued.

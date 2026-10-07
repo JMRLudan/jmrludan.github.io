@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the DNS setup for jmrludan.com and its redirect domains on Cloudflare.
+"""Apply the DNS setup for jmrludan.com and its redirect domain on Cloudflare.
 
 Declarative and idempotent: run it as often as you like, it only changes what
 differs. Reads the API token from the CLOUDFLARE_API_TOKEN environment variable.
@@ -27,7 +27,7 @@ GITHUB_A = ["185.199.108.153", "185.199.109.153", "185.199.110.153", "185.199.11
 GITHUB_AAAA = ["2606:50c0:8000::153", "2606:50c0:8001::153", "2606:50c0:8002::153", "2606:50c0:8003::153"]
 
 # Domains that should 301 to the primary site, keeping the path and query.
-REDIRECT_ZONES = ["joshludan.com", "raccoon.baby"]
+REDIRECT_ZONES = ["joshludan.com"]
 # Cloudflare needs a proxied record to exist before a redirect rule can fire.
 # 192.0.2.1 is a reserved documentation address and never receives traffic.
 PLACEHOLDER_IP = "192.0.2.1"
@@ -167,7 +167,7 @@ def main():
             f"{e}\n\nCloudflare rejected the credential. This script needs an *API Token* "
             "(Cloudflare dashboard > My Profile > API Tokens > Create Token), not the "
             "account's Global API Key. Make sure the full token was copied and that it has "
-            "Zone:Read, DNS:Edit and Dynamic Redirect:Edit on the three zones."
+            "Zone:Read, DNS:Edit and Dynamic Redirect:Edit on both zones."
         )
 
     zones = [PRIMARY] + REDIRECT_ZONES
